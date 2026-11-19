@@ -1,0 +1,9 @@
+{
+  "DB_TYPE": "mysql",
+  "DB_HOST": "35.207.243.110",
+  "DB_PORT": 3306,
+  "DB_USER": "nayagam",
+  "DB_PASSWORD": "woWV5O7#TGO7x#5",
+  "DB_NAME": "sb_auckam_db",
+  "FALLBACK_TO_SQLITE": false
+}

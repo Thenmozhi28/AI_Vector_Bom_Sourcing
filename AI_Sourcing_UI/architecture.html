@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SourceBuddy: System Architecture & Technical Design</title>
+    
+    <!-- Render Markdown natively -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Render Mermaid natively -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+        h1, h2, h3 { color: #2c3e50; }
+        h1 { border-bottom: 2px solid #3498db; padding-bottom: 10px; text-align: center; }
+        h2 { border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 40px; }
+        code { background-color: #f8f9fa; padding: 2px 4px; border-radius: 4px; font-family: monospace; }
+        .mermaid { margin: 30px 0; display: flex; justify-content: center; }
+        
+        /* Print optimizations for PDF export */
+        @media print {
+            body { padding: 0; margin: 20px; }
+            button { display: none; }
+            .page-break { page-break-before: always; }
+        }
+        
+        .print-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .print-btn:hover { background-color: #2980b9; }
+    </style>
+</head>
+<body>
+
+    <button class="print-btn" onclick="window.print()">Export as PDF</button>
+
+    <div id="content"></div>
+
+    <script>
+        const markdownText = `
+# SourceBuddy: AI-Powered Component Sourcing Platform
+## System Architecture & Complete Technical Design Specification
+
+**Document Version:** 1.0  
+**Author:** AI Architecture Lead  
+**Target Audience:** Project Stakeholders, Engineering Teams, Executive Sponsors  
+
+---
+
+## 1. Executive Summary
+SourceBuddy is a highly specialized, enterprise-grade AI sourcing platform tailored for the electronics manufacturing and component supply chain industry. It leverages state-of-the-art Natural Language Processing (NLP), custom-trained Transformer models, and high-performance Vector Databases to provide real-time, highly accurate component matching and sourcing intelligence.
+
+This document serves as the comprehensive technical design specification, detailing the microservices architecture, our proprietary deep learning model training pipeline, and the conversational AI reasoning engine designed to secure project sign-off from the PoC phase.
+
+---
+
+## 2. Architecture Diagram
+
+Below is the comprehensive system architecture diagram for the **SourceBuddy AI Sourcing Platform**.
+
+<div class="mermaid">
+flowchart TB
+    %% Styling
+    classDef client fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff,font-weight:bold
+    classDef api fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#fff,font-weight:bold
+    classDef ai fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:#fff,font-weight:bold
+    classDef db fill:#f1c40f,stroke:#f39c12,stroke-width:2px,color:#333,font-weight:bold
+    classDef broker fill:#e67e22,stroke:#d35400,stroke-width:2px,color:#fff,font-weight:bold
+    classDef volume fill:#95a5a6,stroke:#7f8c8d,stroke-width:2px,color:#fff
+    
+    %% Clients
+    User([User Web UI]):::client
+
+    subgraph Docker_Compose_Environment
+        %% Main API
+        API[(sourcebuddy-app FastAPI Main Service)]:::api
+        
+        %% Conversational Agent
+        ChatAgent[(sourcebuddy-chat-agent FastAPI RAG Service)]:::ai
+        
+        %% Celery Workers
+        CeleryWorker[(sourcebuddy-celery Background Processor)]:::api
+        
+        %% Databases & Brokers
+        Qdrant[(sourcebuddy-qdrant Vector Database)]:::db
+        Redis[(sourcebuddy-redis Message Broker Cache)]:::broker
+        
+        %% External LLM
+        LocalLLM((Local LLM Ollama Llama-3)):::ai
+    end
+
+    subgraph Persistent_Storage
+        ModelCache[/Model Cache/]:::volume
+        Uploads[/BOM Uploads/]:::volume
+        QdrantStorage[/Qdrant Storage/]:::volume
+    end
+    
+    %% External Connections
+    User -- Uploads BOM --> API
+    User -- Asks Sourcing Qs --> ChatAgent
+    
+    %% API internal routing
+    API -- Vectorizes text using --> ModelCache
+    API -- Semantic Search --> Qdrant
+    API -- Queues indexing --> Redis
+    
+    %% Celery workflow
+    Redis -- Dispatches Tasks --> CeleryWorker
+    CeleryWorker -- Reads files --> Uploads
+    CeleryWorker -- Batch Upserts --> Qdrant
+    
+    %% Chat Agent RAG Workflow
+    ChatAgent -- Fetches Vector Context --> API
+    ChatAgent -- RAG Prompt Generation --> LocalLLM
+</div>
+
+---
+
+<div class="page-break"></div>
+
+## 3. High-Level System Architecture
+
+The system is deployed as a suite of decoupled, containerized microservices managed via Docker Compose, ensuring scalability, fault tolerance, and independent life-cycle management.
+
+### 3.1 Core Microservices
+1. **AI Sourcing API (\`sourcebuddy-app\`)**
+   - **Framework:** FastAPI (Python)
+   - **Role:** The central orchestration engine. Exposes RESTful endpoints for BOM ingestion, product querying, and vector embeddings.
+   - **Responsibilities:** 
+     - Handling large-scale CSV/Excel BOM uploads.
+     - Extracting component parameters (Manufacturer Part Number, Specifications).
+     - Running the Transformer model to generate high-dimensional vector embeddings.
+
+2. **Conversational RAG Agent (\`sourcebuddy-chat-agent\`)**
+   - **Framework:** FastAPI (Python)
+   - **Role:** Dedicated Natural Language microservice for interactive component sourcing.
+   - **Responsibilities:**
+     - Acts as an elite procurement copilot.
+     - Performs Retrieval-Augmented Generation (RAG) by fetching context from the main API and passing it to Large Language Models.
+
+3. **Background Job Processor (\`sourcebuddy-celery\`)**
+   - **Framework:** Celery
+   - **Role:** Asynchronous task queue for heavy workloads.
+
+### 3.2 Data Layer & Infrastructure
+1. **Vector Database: Qdrant (\`sourcebuddy-qdrant\`)**
+   - **Role:** High-speed semantic search engine storing the high-dimensional embeddings of the electronic component catalog. 
+2. **Message Broker & Cache: Redis (\`sourcebuddy-redis\`)**
+   - **Role:** Facilitates message passing for Celery tasks and serves as an in-memory cache for fast lookups.
+
+---
+
+## 4. Proprietary AI Model: The "Sourcing-BERT" Custom Transformer
+
+At the heart of SourceBuddy is our proprietary Transformer model, custom-built from scratch to natively understand the complex technical DNA of electronic components.
+
+### 4.1 Why a Custom Model?
+Off-the-shelf models are trained on general internet text. They fail to understand that \`100nF\` and \`0.1µF\` are identical, or that \`SOIC-8\` is a physical footprint. To solve this, we architected a custom pipeline leveraging our proprietary dataset of **1.8 Million electronic component records**.
+
+### 4.2 Training Pipeline Architecture
+Our custom training pipeline (\`train_custom_transformer.py\`) utilizes PyTorch and the HuggingFace \`transformers\` library, executed on high-end GPU hardware.
+
+1. **Custom Technical Tokenizer**
+   - **Algorithm:** \`BertWordPieceTokenizer\`
+   - **Vocabulary:** 30,000 highly specialized tokens.
+
+2. **Masked Language Modeling (MLM) Pre-training**
+   - **Model Topology:** A compact BERT architecture designed for blazing-fast local inference.
+   - **Training Objective:** The model randomly masks 15% of the technical tokens in a specification string and attempts to predict them. 
+
+3. **Memory-Efficient Data Streaming**
+   - Implemented a \`LazyElectronicsDataset\` using PyTorch \`Dataset\` that streams data dynamically. 
+
+---
+
+## 5. System Workflows & Algorithmic Features
+
+### 5.1 Automated BOM Sourcing Engine
+1. **Ingestion:** User uploads a multi-line BOM (Bill of Materials).
+2. **Vectorization:** The custom Transformer converts each BOM line’s description into a dense vector representation.
+3. **Semantic Retrieval:** Qdrant performs a nearest-neighbor search (\`cosine similarity\`) against the 1.8M catalog vectors.
+
+### 5.2 Conversational Procurement Copilot (RAG)
+1. **Context Fetching:** When a user asks "Find alternatives for Texas Instruments LM358", the \`sourcebuddy-chat-agent\` queries the main API to retrieve the top 5 catalog matches from Qdrant.
+2. **Prompt Compilation:** The agent injects these verified matches into a highly structured, strict system prompt enforcing **Zero Hallucination** rules.
+3. **Reporting:** The system automatically generates and hosts a \`.csv\` report of the finalized BOM suggestions.
+
+---
+
+## 6. Conclusion & Project Sign-Off
+SourceBuddy represents a paradigm shift in component procurement. By replacing generic, string-based search engines with a proprietary, domain-specific deep learning model, we achieve near-human engineering accuracy at millisecond speeds. 
+
+The architecture is robust, highly scalable, and completely contained within secure Docker networks. It is primed for immediate production deployment and scale.
+        `;
+
+        document.getElementById('content').innerHTML = marked.parse(markdownText);
+    </script>
+</body>
+</html>

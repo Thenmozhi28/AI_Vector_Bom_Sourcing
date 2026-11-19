@@ -1,0 +1,7 @@
+uploads/
+qdrant_storage/
+model_cache/
+*.db
+*.sqlite
+__pycache__/
+.env
